@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "urdf-validator"
+version = "0.1.0"
+requires-python = ">=3.8"
+dependencies = [
+    "urdf_parser_py",
+    "numpy",
+    "shapely",
+]
+
+[project.optional-dependencies]
+full = ["ikpy", "xacro"]
+mujoco = ["mujoco"]
+dev = ["pytest"]
+
+[project.scripts]
+urdf_validate = "urdf_validator_main.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["urdf_validator_main*"]
