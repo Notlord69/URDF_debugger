@@ -85,13 +85,13 @@ An engineer or researcher working on sim-to-real transfer, who needs to verify t
 
 urdf_validator is a Python package with a CLI entry point. It is organized into five phases that execute sequentially on a given URDF file. Each phase produces a structured report dataclass. The full pipeline terminates in a terminal-formatted summary and an optional JSON export.
 
-Top-level module structure:
+Top-level module structure (Python package: `urdf_validator_main`):
 
 - cli.py - entry point: urdf_validate &lt;file.urdf&gt; \[options\]
 - parser/ - urdf_adapter.py (wraps urdf_parser_py), xacro_handler.py (preprocesses .xacro)
 - physics/ - geometry_physics.py (inertia computation), chain_walker.py (kinematic tree traversal)
 - checks/ - schema.py (Phase 1), statics.py (Phase 2), stability.py (Phase 3), workspace.py (Phase 4)
-- report/ - dataclasses.py (ValidationReport), formatter.py (terminal output), json_export.py (JSON output)
+- report/ - models.py (ValidationReport and all report dataclasses), formatter.py (terminal output), json_export.py (JSON output)
 - integrations/ - mujoco_wrapper.py (optional, lazy import, Phase 5 deep mode)
 
 ## **3.2 Phase 1 - URDF Parsing & Schema Validation**
