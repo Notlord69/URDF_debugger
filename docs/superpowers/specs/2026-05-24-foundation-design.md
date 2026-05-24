@@ -53,7 +53,7 @@ urdf_validator/                        ← repo / project root
 ```toml
 [build-system]
 requires = ["setuptools>=68"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "urdf-validator"
