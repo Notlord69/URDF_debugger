@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: urdf-validator
+Version: 0.1.0
+Requires-Python: >=3.8
+License-File: LICENSE
+Requires-Dist: urdf_parser_py
+Requires-Dist: numpy
+Requires-Dist: shapely
+Provides-Extra: full
+Requires-Dist: ikpy; extra == "full"
+Requires-Dist: xacro; extra == "full"
+Provides-Extra: mujoco
+Requires-Dist: mujoco; extra == "mujoco"
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Dynamic: license-file

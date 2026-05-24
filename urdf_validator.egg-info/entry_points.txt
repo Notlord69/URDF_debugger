@@ -1,0 +1,2 @@
+[console_scripts]
+urdf_validate = urdf_validator_main.cli:main

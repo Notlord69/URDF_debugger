@@ -1,0 +1,13 @@
+urdf_parser_py
+numpy
+shapely
+
+[dev]
+pytest
+
+[full]
+ikpy
+xacro
+
+[mujoco]
+mujoco

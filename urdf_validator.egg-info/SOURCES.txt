@@ -1,0 +1,12 @@
+LICENSE
+README.md
+pyproject.toml
+tests/test_install.py
+urdf_validator.egg-info/PKG-INFO
+urdf_validator.egg-info/SOURCES.txt
+urdf_validator.egg-info/dependency_links.txt
+urdf_validator.egg-info/entry_points.txt
+urdf_validator.egg-info/requires.txt
+urdf_validator.egg-info/top_level.txt
+urdf_validator_main/__init__.py
+urdf_validator_main/cli.py
