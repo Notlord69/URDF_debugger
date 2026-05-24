@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# AI-generated docs and tooling
+docs/
+.claude/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
