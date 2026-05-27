@@ -83,8 +83,9 @@ def _check_missing_root(parsed: ParsedRobot, report: ValidationReport) -> None:
             "(kinematic loop or broken reference)"
         )
     elif len(root_candidates) > 1:
-        report.schema.infos.append(
-            f"Multiple root links found: {root_candidates} — expected exactly one"
+        report.schema.warnings.append(
+            f"Multiple root links found: {root_candidates} "
+            "— disconnected URDF (multiple kinematic trees)"
         )
     # Exactly one root → silent pass
 
@@ -196,6 +197,13 @@ def _check_inertia_positive_definite(
         if np.all(lnk.inertia_3x3 == 0):
             continue  # already reported by _check_zero_inertia
         try:
+            # Guard against NaN/Inf values — they silently pass eigenvalue checks
+            if not np.all(np.isfinite(lnk.inertia_3x3)):
+                report.schema.warnings.append(
+                    f"Link '{lnk.name}' has non-finite inertia values (NaN/Inf) "
+                    "— tensor is malformed"
+                )
+                continue
             eigenvalues = np.linalg.eigvalsh(lnk.inertia_3x3)
             if np.any(eigenvalues <= 0):
                 min_ev = float(np.min(eigenvalues))

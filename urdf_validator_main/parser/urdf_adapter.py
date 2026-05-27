@@ -113,13 +113,13 @@ def load_urdf(path: str) -> Union[ParsedRobot, ParseError]:
     and a string representation of the original exception (never a live object).
 
     Two independent try/except blocks:
-      1. XML parse block  — wraps URDF.from_xml_file
-      2. Extraction block — builds IR dataclasses from the parsed robot object
+      1. XML parse block  — wraps the urdf_parser_py import AND URDF.from_xml_file
+      2. Extraction block — builds IR dataclasses from the parsed robot object,
+         with per-entry protection so one bad link/joint doesn't abort the whole IR
     """
-    from urdf_parser_py.urdf import URDF  # lazy import keeps start-up fast
-
-    # --- Block 1: XML parse ---------------------------------------------------
+    # --- Block 1: import + XML parse -----------------------------------------
     try:
+        from urdf_parser_py.urdf import URDF  # lazy; import error caught here
         robot = URDF.from_xml_file(path)
     except Exception as e:
         return ParseError(
@@ -134,36 +134,47 @@ def load_urdf(path: str) -> Union[ParsedRobot, ParseError]:
         child_to_joint_type: dict = {}
         parsed_joints: List[ParsedJoint] = []
         for j in robot.joints:
-            child_to_joint_type[j.child] = j.type
-            lims = j.limit
-            parsed_joints.append(
-                ParsedJoint(
-                    name=j.name,
-                    joint_type=j.type,
-                    parent=j.parent,
-                    child=j.child,
-                    limit_lower=lims.lower if lims is not None else None,
-                    limit_upper=lims.upper if lims is not None else None,
-                    limit_effort=lims.effort if lims is not None else None,
-                    limit_velocity=lims.velocity if lims is not None else None,
+            try:
+                child_to_joint_type[j.child] = j.type
+                lims = j.limit
+                parsed_joints.append(
+                    ParsedJoint(
+                        name=j.name,
+                        joint_type=j.type,
+                        parent=j.parent,
+                        child=j.child,
+                        limit_lower=lims.lower if lims is not None else None,
+                        limit_upper=lims.upper if lims is not None else None,
+                        limit_effort=lims.effort if lims is not None else None,
+                        limit_velocity=lims.velocity if lims is not None else None,
+                    )
                 )
-            )
+            except Exception:
+                # Skip individual malformed joints; outer block catches catastrophic failures
+                continue
 
         parsed_links: List[ParsedLink] = []
         for lnk in robot.links:
-            mass: Optional[float] = None
-            if lnk.inertial is not None and lnk.inertial.mass is not None:
-                mass = float(lnk.inertial.mass)
-            parsed_links.append(
-                ParsedLink(
-                    name=lnk.name,
-                    mass=mass,
-                    inertia_3x3=_extract_inertia(lnk),
-                    joint_type_incoming=child_to_joint_type.get(lnk.name),
-                    visual_geometry_type=_geometry_type(lnk.visuals),
-                    collision_geometry_type=_geometry_type(lnk.collisions),
+            try:
+                mass: Optional[float] = None
+                if lnk.inertial is not None and lnk.inertial.mass is not None:
+                    try:
+                        mass = float(lnk.inertial.mass)
+                    except (TypeError, ValueError):
+                        mass = None  # non-numeric mass → treated as unknown
+                parsed_links.append(
+                    ParsedLink(
+                        name=lnk.name,
+                        mass=mass,
+                        inertia_3x3=_extract_inertia(lnk),
+                        joint_type_incoming=child_to_joint_type.get(lnk.name),
+                        visual_geometry_type=_geometry_type(lnk.visuals),
+                        collision_geometry_type=_geometry_type(lnk.collisions),
+                    )
                 )
-            )
+            except Exception:
+                # Skip individual malformed links; outer block catches catastrophic failures
+                continue
 
         return ParsedRobot(
             name=robot.name,
