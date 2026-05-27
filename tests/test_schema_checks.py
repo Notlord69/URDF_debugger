@@ -261,3 +261,115 @@ def test_schema_status_critical_when_any_critical():
         f"Expected CRITICAL (broken ref present), got {report.schema.status}. "
         f"Criticals: {report.schema.critical_issues}, Warnings: {report.schema.warnings}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Physics checks — zero mass
+# ---------------------------------------------------------------------------
+
+def test_zero_mass_non_fixed_link_is_warning():
+    # arm_link has mass=0.0 and joint_type_incoming="revolute" → warning
+    robot = ParsedRobot(
+        name="zero_mass_robot",
+        links=[
+            _make_link("base_link", joint_type_incoming=None),
+            _make_link("arm_link", mass=0.0),  # revolute (default), zero mass
+        ],
+        joints=[_make_joint("arm_joint", "base_link", "arm_link")],
+    )
+    report = _run(robot)
+    assert any(
+        "arm_link" in w and "mass" in w.lower() for w in report.schema.warnings
+    ), f"Expected zero-mass warning for arm_link, got: {report.schema.warnings}"
+
+
+def test_zero_mass_fixed_link_is_silent():
+    # sensor_frame is a fixed child link with mass=0 → must NOT generate a warning
+    robot = ParsedRobot(
+        name="fixed_zero_mass",
+        links=[
+            _make_link("base_link", joint_type_incoming=None),
+            _make_link("sensor_frame", mass=0.0, joint_type_incoming="fixed"),
+        ],
+        joints=[
+            _make_joint("sensor_joint", "base_link", "sensor_frame", joint_type="fixed")
+        ],
+    )
+    report = _run(robot)
+    assert not any(
+        "sensor_frame" in w for w in report.schema.warnings
+    ), f"Fixed link with zero mass must not warn. Got: {report.schema.warnings}"
+
+
+# ---------------------------------------------------------------------------
+# Physics checks — zero inertia tensor
+# ---------------------------------------------------------------------------
+
+def test_zero_inertia_non_fixed_link_is_warning():
+    zero_inertia = np.zeros((3, 3))
+    robot = ParsedRobot(
+        name="zero_inertia_robot",
+        links=[
+            _make_link("base_link", joint_type_incoming=None),
+            _make_link("arm_link", inertia=zero_inertia),
+        ],
+        joints=[_make_joint("arm_joint", "base_link", "arm_link")],
+    )
+    report = _run(robot)
+    assert any(
+        "arm_link" in w and "zero inertia" in w.lower() for w in report.schema.warnings
+    ), f"Expected all-zero-inertia warning for arm_link, got: {report.schema.warnings}"
+
+
+# ---------------------------------------------------------------------------
+# Physics checks — non-positive-definite inertia
+# ---------------------------------------------------------------------------
+
+def test_nonpositive_definite_inertia_is_warning():
+    # The 2×2 block [[0.1, 0.5], [0.5, 0.1]] has eigenvalues 0.6 and -0.4.
+    # Full matrix eigenvalues: 0.6, -0.4, 0.1 — one is negative → physically impossible.
+    bad_inertia = np.array(
+        [
+            [0.1, 0.5, 0.0],
+            [0.5, 0.1, 0.0],
+            [0.0, 0.0, 0.1],
+        ],
+        dtype=float,
+    )
+    robot = ParsedRobot(
+        name="bad_inertia_robot",
+        links=[
+            _make_link("base_link", joint_type_incoming=None),
+            _make_link("arm_link", inertia=bad_inertia),
+        ],
+        joints=[_make_joint("arm_joint", "base_link", "arm_link")],
+    )
+    report = _run(robot)
+    assert any(
+        "arm_link" in w and "non-positive-definite" in w and "eigenvalue" in w
+        for w in report.schema.warnings
+    ), f"Expected eigenvalue warning for arm_link, got: {report.schema.warnings}"
+
+
+# ---------------------------------------------------------------------------
+# No-crash guarantee over all reference URDFs
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("urdf_name", [
+    "ANYmal.urdf",
+    "Franka_Panda.urdf",
+    "PR2.urdf",
+    "Spot.urdf",
+    "TurtleBot3.urdf",
+    "fetch.urdf",
+])
+def test_all_six_reference_urdfs_schema_does_not_crash(urdf_name):
+    path = os.path.join(SAMPLE_DIR, urdf_name)
+    result = load_urdf(path)
+    if isinstance(result, ParsedRobot):
+        report = ValidationReport()
+        schema.run(result, report)
+        assert report.schema.status in ("PASS", "WARN", "INFO", "CRITICAL"), (
+            f"status must be a known value, got {report.schema.status!r} for {urdf_name}"
+        )
+    # If ParseError, that's acceptable — load_urdf handled the failure; no exception raised
