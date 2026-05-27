@@ -48,16 +48,57 @@ class ParseError:
 
 
 # ---------------------------------------------------------------------------
-# Private helpers (implemented in Task 2)
+# Private helpers
 # ---------------------------------------------------------------------------
 
+_GEOM_CLASS_TO_TYPE = {
+    "Box": "box",
+    "Cylinder": "cylinder",
+    "Sphere": "sphere",
+    "Mesh": "mesh",
+}
+
+
 def _extract_inertia(link) -> Optional[np.ndarray]:
-    """Stub — returns None until Task 2."""
-    return None
+    """Build a symmetric (3,3) numpy array from a urdf_parser_py link's inertial block.
+
+    Returns None if the block is absent, incomplete, or raises any error.
+    Wrapped in try/except so a malformed-but-parseable URDF never propagates.
+    """
+    try:
+        if link.inertial is None or link.inertial.inertia is None:
+            return None
+        i = link.inertial.inertia
+        return np.array(
+            [
+                [i.ixx, i.ixy, i.ixz],
+                [i.ixy, i.iyy, i.iyz],
+                [i.ixz, i.iyz, i.izz],
+            ],
+            dtype=float,
+        )
+    except Exception:
+        return None
 
 
 def _geometry_type(geoms) -> Optional[str]:
-    """Stub — returns None until Task 2."""
+    """Return the type string of the first geometry in a visuals/collisions list.
+
+    Returns one of "box", "cylinder", "sphere", "mesh", or None.
+    Month 1 only needs the type string, not dimensions.
+    """
+    if not geoms:
+        return None
+    for geom in geoms:
+        try:
+            g = geom.geometry
+            if g is None:
+                continue
+            t = _GEOM_CLASS_TO_TYPE.get(type(g).__name__)
+            if t is not None:
+                return t
+        except Exception:
+            continue
     return None
 
 
@@ -66,9 +107,72 @@ def _geometry_type(geoms) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 def load_urdf(path: str) -> Union[ParsedRobot, ParseError]:
-    """Stub — always returns ParseError until Task 2 implements the full body."""
-    return ParseError(
-        path=path,
-        message="load_urdf not yet implemented",
-        raw_exception="",
-    )
+    """Parse a URDF file and return a ParsedRobot or ParseError.
+
+    Never raises. All failure modes produce a ParseError with a string message
+    and a string representation of the original exception (never a live object).
+
+    Two independent try/except blocks:
+      1. XML parse block  — wraps URDF.from_xml_file
+      2. Extraction block — builds IR dataclasses from the parsed robot object
+    """
+    from urdf_parser_py.urdf import URDF  # lazy import keeps start-up fast
+
+    # --- Block 1: XML parse ---------------------------------------------------
+    try:
+        robot = URDF.from_xml_file(path)
+    except Exception as e:
+        return ParseError(
+            path=path,
+            message=f"Failed to parse URDF: {os.path.basename(path)}",
+            raw_exception=repr(e),
+        )
+
+    # --- Block 2: IR extraction -----------------------------------------------
+    try:
+        # Build child → joint_type map in a single pass over joints
+        child_to_joint_type: dict = {}
+        parsed_joints: List[ParsedJoint] = []
+        for j in robot.joints:
+            child_to_joint_type[j.child] = j.type
+            lims = j.limit
+            parsed_joints.append(
+                ParsedJoint(
+                    name=j.name,
+                    joint_type=j.type,
+                    parent=j.parent,
+                    child=j.child,
+                    limit_lower=lims.lower if lims is not None else None,
+                    limit_upper=lims.upper if lims is not None else None,
+                    limit_effort=lims.effort if lims is not None else None,
+                    limit_velocity=lims.velocity if lims is not None else None,
+                )
+            )
+
+        parsed_links: List[ParsedLink] = []
+        for lnk in robot.links:
+            mass: Optional[float] = None
+            if lnk.inertial is not None and lnk.inertial.mass is not None:
+                mass = float(lnk.inertial.mass)
+            parsed_links.append(
+                ParsedLink(
+                    name=lnk.name,
+                    mass=mass,
+                    inertia_3x3=_extract_inertia(lnk),
+                    joint_type_incoming=child_to_joint_type.get(lnk.name),
+                    visual_geometry_type=_geometry_type(lnk.visuals),
+                    collision_geometry_type=_geometry_type(lnk.collisions),
+                )
+            )
+
+        return ParsedRobot(
+            name=robot.name,
+            links=parsed_links,
+            joints=parsed_joints,
+        )
+    except Exception as e:
+        return ParseError(
+            path=path,
+            message=f"Failed to extract robot data: {os.path.basename(path)}",
+            raw_exception=repr(e),
+        )
