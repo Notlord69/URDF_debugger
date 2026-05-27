@@ -21,6 +21,9 @@ The PRD (`urdf_validator_PRD.md`) is the authoritative specification for what to
 ## Agentic Workflow
 Allow maximum of 3 sub agents for each sessions. Ensure sub agents focuses on catching bugs and logic failures.
 
+## Github specific
+No authorship or attribution in git comments
+
 ## How to Verify Your Work
 
 The acceptance standard is correct, non-crashing output on all six reference URDFs. If the tool crashes on any one of them, it is not releasable. Run these before considering any milestone complete.
