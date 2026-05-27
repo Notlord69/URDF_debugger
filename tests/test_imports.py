@@ -22,9 +22,9 @@ def test_integrations_subpackage_importable():
     from urdf_validator_main import integrations  # noqa: F401
 
 
-def test_parser_urdf_adapter_stub():
+def test_parser_urdf_adapter_has_load_urdf():
     from urdf_validator_main.parser import urdf_adapter
-    assert hasattr(urdf_adapter, "URDFAdapter")
+    assert hasattr(urdf_adapter, "load_urdf")
 
 
 def test_parser_xacro_handler_stub():
